@@ -1,14 +1,3 @@
-output "vpc_id" {
-  description = "VPC the API is deployed into."
-  value       = module.network.vpc_id
-}
-
-output "private_subnet_ids" {
-  description = "Private subnets, one per AZ."
-  value       = module.network.private_subnet_ids
-}
-
-# Everything needed to exercise the deployment and read the result.
 output "test_client_function_name" {
   description = "Invoke this to run one request end to end."
   value       = module.test_client.function_name

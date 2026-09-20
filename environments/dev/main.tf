@@ -1,3 +1,4 @@
+# The private network that everything else sits in.
 module "network" {
   source = "../../modules/network"
 
@@ -6,12 +7,11 @@ module "network" {
   azs               = ["eu-west-2a", "eu-west-2b"]
   private_zone_name = "internal.cpe"
 
-  # Only what the workload calls at runtime.
+  # Only the services the functions call at runtime need an endpoint.
   interface_endpoint_services = ["secretsmanager"]
 }
 
-# Owns the certificate authority and everything it signs. Consumers receive
-# ARNs, so no private key crosses a module boundary.
+# The certificate authority and everything it signs.
 module "certificates" {
   source = "../../modules/certificates"
 
@@ -19,11 +19,13 @@ module "certificates" {
   api_hostname      = "api"
   private_zone_name = module.network.private_zone_name
 
-  # Zero so the environment can be rebuilt under the same names on the same day.
-  # Any real environment keeps the default recovery window.
+  # Zero in both modules so the environment can be rebuilt under the same names
+  # on the same day. Any real environment keeps the default recovery window.
   secret_recovery_window_days = 0
 }
 
+# The API itself: the load balancer that enforces mutual TLS, and the
+# function behind it.
 module "api" {
   source = "../../modules/api"
 
@@ -44,7 +46,9 @@ module "api" {
   secret_recovery_window_days = 0
 }
 
-# For verification only.
+# Calls the API from inside the VPC with a certificate this CA signed, going
+# through the same handshake as any other caller. Verification only, not part
+# of the service.
 module "test_client" {
   source = "../../modules/test_client"
 

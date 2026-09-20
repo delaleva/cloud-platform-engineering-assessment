@@ -21,6 +21,9 @@ ALLOWED_CLIENTS_SECRET = os.environ["ALLOWED_CLIENTS_SECRET"]
 CLIENT_SUBJECT_HEADER = "x-amzn-mtls-clientcert-subject"
 MAX_MESSAGE_LENGTH = 4096
 
+# Set up once when the function starts, not on each request. Lambda keeps a
+# function in memory between requests, so the allow list is fetched once and
+# reused until the function is recycled.
 _secrets = boto3.client("secretsmanager")
 _allowed_cache = None
 
@@ -31,7 +34,8 @@ def _log(level, request_id, event, **fields):
 
 
 def _allowed_clients():
-    """Cached for the life of the execution environment, never baked into the package."""
+    """The names allowed to call this API, read from Secrets Manager rather than
+    shipped with the code so the list can change without a deployment."""
     global _allowed_cache
     if _allowed_cache is None:
         payload = _secrets.get_secret_value(SecretId=ALLOWED_CLIENTS_SECRET)
@@ -63,24 +67,32 @@ def _respond(status, request_id, body):
 
 def handler(event, context):
     request_id = context.aws_request_id
+    # The load balancer does not guarantee header casing, so match on lower case.
     headers = {k.lower(): v for k, v in (event.get("headers") or {}).items()}
     method = event.get("httpMethod", "")
 
     _log(logging.INFO, request_id, "request_received", method=method, path=event.get("path"))
 
+    # Only POST is served.
     if method != "POST":
         _log(logging.WARNING, request_id, "method_not_allowed", method=method)
         return _respond(HTTPStatus.METHOD_NOT_ALLOWED, request_id, {"error": "only POST is accepted"})
 
+    # Who is calling. The load balancer has already checked the certificate
+    # against the trust store; this header carries the subject it verified.
     subject = headers.get(CLIENT_SUBJECT_HEADER)
     if not subject:
         _log(logging.WARNING, request_id, "client_certificate_missing")
         return _respond(HTTPStatus.FORBIDDEN, request_id, {"error": "client certificate required"})
 
+    # Whether that caller is still permitted. A valid certificate proves the CA
+    # signed it, not that the holder should be served.
     common_name = _common_name(subject)
     try:
         allowed = _allowed_clients()
     except Exception as error:
+        # We could not tell whether the caller is allowed, which is not their
+        # fault, so this is 500 rather than 403.
         _log(logging.ERROR, request_id, "allow_list_unavailable", error=str(error))
         return _respond(HTTPStatus.INTERNAL_SERVER_ERROR, request_id, {"error": "internal error"})
 
@@ -88,6 +100,8 @@ def handler(event, context):
         _log(logging.WARNING, request_id, "client_not_authorised", common_name=common_name)
         return _respond(HTTPStatus.FORBIDDEN, request_id, {"error": "client not authorised"})
 
+    # Only now is the body looked at, so an unauthorised caller never reaches
+    # the parsing below.
     try:
         payload = json.loads(event.get("body") or "")
     except (TypeError, ValueError):
@@ -107,6 +121,8 @@ def handler(event, context):
 
     _log(logging.INFO, request_id, "request_accepted", common_name=common_name)
 
+    # Returning the name taken from the certificate is what makes a success
+    # provable rather than merely claimed.
     return _respond(HTTPStatus.OK, request_id, {
         "message": message,
         "timestamp": datetime.now(timezone.utc).isoformat(),
