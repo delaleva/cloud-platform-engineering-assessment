@@ -1,0 +1,86 @@
+name: terraform
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege by default. Only the plan job raises these permissions.
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: 1.16.3
+  TF_IN_AUTOMATION: "true"
+  AWS_REGION: eu-west-2
+
+jobs:
+  check:
+    name: format, validate and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff
+
+      # No credentials are needed here because -backend=false skips state entirely.
+      - name: Validate every root
+        run: |
+          for dir in bootstrap environments/dev; do
+            terraform -chdir="$dir" init -backend=false -input=false
+            terraform -chdir="$dir" validate
+          done
+
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.64.0
+
+      # Gates the build, because these findings are deterministic.
+      - name: tflint
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tflint --init --config="${GITHUB_WORKSPACE}/.tflint.hcl"
+          tflint --recursive --config="${GITHUB_WORKSPACE}/.tflint.hcl" --format compact
+
+      # Warns only, because this repository has documented gaps that would fail it.
+      - name: checkov
+        continue-on-error: true
+        run: |
+          pipx install checkov==3.3.19
+          checkov --directory . --framework terraform --quiet --compact
+
+  plan:
+    name: plan dev
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # lets this job request the GitHub OIDC token
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+
+      # Exchanges the OIDC token for short-lived credentials, so no keys are stored.
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          # Logs are public on a public repository, and a plan prints ARNs.
+          mask-aws-account-id: true
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # The plan is never written to a file, because it would contain resolved
+      # attribute values and account identifiers.
+      - name: Plan
+        run: |
+          terraform -chdir=environments/dev init -input=false
+          terraform -chdir=environments/dev plan -input=false -no-color

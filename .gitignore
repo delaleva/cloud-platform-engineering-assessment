@@ -4,6 +4,7 @@
 # .tfstate files
 *.tfstate
 *.tfstate.*
+terraform.tfstate.d/
 
 # Crash log files
 crash.log
@@ -42,3 +43,41 @@ terraform.rc
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
 # planout
+# Private key and certificate material (tls provider output)
+*.pem
+*.key
+
+# Saved plan files (contain resolved attributes and account identifiers)
+tfplan
+*.tfplan
+plan.out
+
+# Lambda packaging output from the archive provider
+.build/
+*.zip
+
+# Python bytecode, which the archive provider would otherwise package
+__pycache__/
+*.pyc
+
+# Output written by the verification invoke
+response.json
+
+# Other certificate material formats
+*.crt
+*.csr
+*.p12
+
+# Local environment files
+.env
+.envrc
+
+# Working notes and assistant context, not part of the deliverable
+CLAUDE.md
+.claude/
+
+# Editor and OS noise
+.DS_Store
+.vscode/
+.idea/
+*.swp
