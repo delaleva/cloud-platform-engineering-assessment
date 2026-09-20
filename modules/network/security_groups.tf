@@ -1,4 +1,5 @@
-# name_prefix so a replacement can be created before the old one is destroyed.
+# Uses name_prefix so a replacement can be created before the old group is
+# destroyed, which a fixed name would prevent.
 resource "aws_security_group" "vpc_endpoint" {
   name_prefix = "${var.name}-vpc-endpoint-"
   description = "Interface endpoint network interfaces"
@@ -13,7 +14,8 @@ resource "aws_security_group" "vpc_endpoint" {
   }
 }
 
-# Adopted and left empty so nothing can rely on it.
+# The VPC's default security group is adopted and left empty so that no
+# workload can quietly depend on it.
 resource "aws_default_security_group" "this" {
   vpc_id = aws_vpc.this.id
 

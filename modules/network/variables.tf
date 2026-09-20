@@ -35,5 +35,29 @@ variable "azs" {
 variable "interface_endpoint_services" {
   description = "AWS service short names to create interface endpoints for, such as secretsmanager or kms."
   type        = set(string)
-  default     = ["secretsmanager"]
+  default     = []
+}
+
+variable "log_retention_days" {
+  description = "Retention for the VPC flow log and resolver query log groups, in days."
+  type        = number
+  default     = 365
+
+  validation {
+    condition = contains(
+      [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653],
+      var.log_retention_days
+    )
+    error_message = "log_retention_days must be one of the retention periods CloudWatch Logs accepts."
+  }
+}
+
+variable "private_zone_name" {
+  description = "Private DNS zone associated with the VPC, such as internal.example."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$", var.private_zone_name))
+    error_message = "private_zone_name must be a valid DNS name of at least two labels, such as internal.example."
+  }
 }

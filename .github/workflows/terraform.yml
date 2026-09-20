@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
 
-# Least privilege by default. Only the plan job raises this.
+# Least privilege by default. Only the plan job raises these permissions.
 permissions:
   contents: read
 
@@ -29,7 +29,7 @@ jobs:
       - name: Check formatting
         run: terraform fmt -check -recursive -diff
 
-      # No credentials needed: -backend=false skips state entirely.
+      # No credentials are needed here because -backend=false skips state entirely.
       - name: Validate every root
         run: |
           for dir in bootstrap environments/dev; do
@@ -41,7 +41,7 @@ jobs:
         with:
           tflint_version: v0.64.0
 
-      # Gates the build: findings are deterministic and worth blocking on.
+      # Gates the build, because these findings are deterministic.
       - name: tflint
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,7 +49,7 @@ jobs:
           tflint --init --config="${GITHUB_WORKSPACE}/.tflint.hcl"
           tflint --recursive --config="${GITHUB_WORKSPACE}/.tflint.hcl" --format compact
 
-      # Warns only: the documented gaps in this repository would fail it.
+      # Warns only, because this repository has documented gaps that would fail it.
       - name: checkov
         continue-on-error: true
         run: |
@@ -66,25 +66,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # TEMPORARY: prints the claims GitHub signs, to compare against the
-      # trust policy. Remove once authentication works.
-      - name: Show OIDC claims
-        run: |
-          token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | python3 -c "import json,sys; print(json.load(sys.stdin)['value'])")
-          python3 -c "
-          import base64, json, sys
-          part = sys.argv[1].split('.')[1]
-          part += '=' * (-len(part) % 4)
-          claims = json.loads(base64.urlsafe_b64decode(part))
-          print('sub:       ', claims.get('sub'))
-          print('aud:       ', claims.get('aud'))
-          print('repository:', claims.get('repository'))
-          print('event_name:', claims.get('event_name'))
-          " "$token"
-
-      # Exchanges the OIDC token for short-lived credentials. No stored keys.
+      # Exchanges the OIDC token for short-lived credentials, so no keys are stored.
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -96,7 +78,8 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      # Never written to a file: a plan artefact contains resolved values.
+      # The plan is never written to a file, because it would contain resolved
+      # attribute values and account identifiers.
       - name: Plan
         run: |
           terraform -chdir=environments/dev init -input=false

@@ -1,18 +1,7 @@
 data "aws_region" "current" {}
 
-# Gateway endpoint for S3.
-resource "aws_vpc_endpoint" "s3" {
-  vpc_id            = aws_vpc.this.id
-  service_name      = "com.amazonaws.${data.aws_region.current.region}.s3"
-  vpc_endpoint_type = "Gateway"
-  route_table_ids   = [aws_route_table.private.id]
-
-  tags = {
-    Name = "${var.name}-s3-gateway"
-  }
-}
-
-# One ENI per subnet. Private DNS means the SDK needs no endpoint override.
+# One network interface per subnet. Private DNS lets the SDK resolve the normal
+# service hostname to these interfaces without an endpoint override.
 resource "aws_vpc_endpoint" "interface" {
   for_each = var.interface_endpoint_services
 

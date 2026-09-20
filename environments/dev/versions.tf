@@ -8,8 +8,8 @@ terraform {
     }
   }
 
-  # Remote state is not enabled for this sandbox run.
-  # Terraform 1.10+ locks natively, so no DynamoDB table.
+  # Remote state is not enabled for this sandbox. Terraform 1.10 and later
+  # lock natively, so no DynamoDB table is needed.
   #
   # backend "s3" {
   #   bucket       = "cpe-tfstate-<account-id>-eu-west-2"

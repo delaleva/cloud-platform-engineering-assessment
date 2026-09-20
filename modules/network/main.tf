@@ -1,8 +1,8 @@
-# Private VPC: no internet gateway, no NAT, no public subnets.
-# DNS hostnames must be on for interface endpoint private DNS to work.
-
+# A private VPC with no internet gateway, no NAT and no public subnets.
 resource "aws_vpc" "this" {
-  cidr_block           = var.vpc_cidr
+  cidr_block = var.vpc_cidr
+
+  # Interface endpoint private DNS does not resolve without hostnames enabled.
   enable_dns_support   = true
   enable_dns_hostnames = true
 
@@ -24,7 +24,8 @@ resource "aws_subnet" "private" {
   }
 }
 
-# No default route, so there is no internet path out of these subnets.
+# This table carries no default route, so nothing in these subnets has a path
+# to the internet.
 resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
@@ -40,4 +41,6 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private.id
 }
 
-# The default NACL is left as-is. Security groups do least privilege here.
+# The default network ACL allows all traffic in both directions, and is left
+# that way. Nothing outside the VPC can reach these subnets, and the security
+# groups already control every path inside it.

@@ -1,8 +1,7 @@
-# Credentials come from the environment: AWS_PROFILE locally, OIDC in CI.
 provider "aws" {
   region = local.region
 
-  # Common tags for every resource. Modules add only Name.
+  # Modules set only Name, so everything common belongs here.
   default_tags {
     tags = {
       Project     = local.project

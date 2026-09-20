@@ -56,6 +56,13 @@ plan.out
 .build/
 *.zip
 
+# Python bytecode, which the archive provider would otherwise package
+__pycache__/
+*.pyc
+
+# Output written by the verification invoke
+response.json
+
 # Other certificate material formats
 *.crt
 *.csr

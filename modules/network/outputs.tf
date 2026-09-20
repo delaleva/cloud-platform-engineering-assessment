@@ -17,3 +17,13 @@ output "endpoint_security_group_id" {
   description = "Security group attached to the interface endpoint network interfaces."
   value       = aws_security_group.vpc_endpoint.id
 }
+
+output "private_zone_id" {
+  description = "Hosted zone workloads add their records to."
+  value       = aws_route53_zone.private.zone_id
+}
+
+output "private_zone_name" {
+  description = "Name of the private hosted zone."
+  value       = aws_route53_zone.private.name
+}
