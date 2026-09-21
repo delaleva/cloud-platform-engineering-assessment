@@ -1,6 +1,6 @@
 data "aws_iam_policy_document" "kms" {
-  # Without this, a mistake anywhere else in the policy would lock everyone out
-  # of the key permanently, and AWS support cannot recover it.
+  # Hands access decisions to IAM in this account. It also covers the root user,
+  # which cannot be deleted, so the key can never become unmanageable.
   statement {
     sid       = "AccountRootFullAccess"
     effect    = "Allow"
@@ -39,6 +39,26 @@ data "aws_iam_policy_document" "kms" {
       test     = "ArnLike"
       variable = "kms:EncryptionContext:aws:logs:arn"
       values   = ["arn:aws:logs:${local.region}:${local.account_id}:log-group:*"]
+    }
+  }
+
+  # The alarm topic is encrypted with this key, so the alarm service needs to
+  # use it to publish. It is a different principal from CloudWatch Logs above.
+  statement {
+    sid       = "CloudWatchAlarmsToSns"
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey*", "kms:Decrypt"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudwatch.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [local.account_id]
     }
   }
 }
